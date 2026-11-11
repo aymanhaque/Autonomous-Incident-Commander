@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighErrorRate",
+        "severity": "critical",
+        "namespace": "production",
+        "service": "order-service",
+        "error_rate": "45%"
+      },
+      "annotations": {
+        "summary": "Service has high error rate",
+        "description": "Service order-service is returning errors on 45% of requests over the last 10 minutes"
+      },
+      "startsAt": "2026-06-29T10:30:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(command -v chromium-cli)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(npx --no-install chromium-cli --help)",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(mkdir -p /c/Users/jp_nh/AppData/Local/Temp/claude/c--Users-jp-nh-Work2-Autonomous-Incident-Commander-Project/28811a51-b62f-42c6-a97f-9070dcb45c1d/scratchpad/pw-verify)",
+      "Read(//c/Users/jp_nh/AppData/Local/Temp/claude/c--Users-jp-nh-Work2-Autonomous-Incident-Commander-Project/28811a51-b62f-42c6-a97f-9070dcb45c1d/scratchpad/**)",
+      "Bash(npm init *)"
+    ]
+  }
+}

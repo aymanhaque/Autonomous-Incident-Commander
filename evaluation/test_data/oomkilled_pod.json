@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "OOMKilled",
+        "severity": "critical",
+        "namespace": "production",
+        "pod": "payment-service-7d9f8b-xk2p1",
+        "container": "payment-service"
+      },
+      "annotations": {
+        "summary": "Container killed due to OOM",
+        "description": "Container payment-service in pod payment-service-7d9f8b-xk2p1 was OOMKilled"
+      },
+      "startsAt": "2026-06-29T10:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

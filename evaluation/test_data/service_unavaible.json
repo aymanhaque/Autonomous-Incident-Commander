@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "ServiceUnavailable",
+        "severity": "critical",
+        "namespace": "production",
+        "service": "payment-gateway"
+      },
+      "annotations": {
+        "summary": "Service is completely unavailable",
+        "description": "Service payment-gateway has 0 available endpoints and is returning 503 errors on all requests"
+      },
+      "startsAt": "2026-07-06T10:10:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

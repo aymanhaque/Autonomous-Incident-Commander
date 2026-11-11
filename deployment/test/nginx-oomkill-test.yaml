@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-oomkill-test
+  namespace: aic
+  labels:
+    app: nginx-oomkill-test
+    test: oomkill
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-oomkill-test
+  template:
+    metadata:
+      labels:
+        app: nginx-oomkill-test
+        test: oomkill
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          # Memory limit is intentionally too low for nginx to start (needs ~10MB).
+          # Kubernetes will OOMKill the container and restart it repeatedly,
+          # triggering the OOMKilledPod Prometheus alert for AIC testing.
+          resources:
+            requests:
+              memory: "3Mi"
+              cpu: "10m"
+            limits:
+              memory: "3Mi"
+              cpu: "50m"

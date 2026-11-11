@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "CPUThrottling",
+        "severity": "warning",
+        "namespace": "production",
+        "pod": "checkout-service-5c8d9f-lm3n2",
+        "container": "checkout-service"
+      },
+      "annotations": {
+        "summary": "Container CPU is being throttled",
+        "description": "Container checkout-service is being throttled 85% of the time due to CPU limits"
+      },
+      "startsAt": "2026-06-29T10:15:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

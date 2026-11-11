@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "NodeMemoryPressure",
+        "severity": "warning",
+        "namespace": "production",
+        "node": "worker-node-3"
+      },
+      "annotations": {
+        "summary": "Node is under memory pressure",
+        "description": "Node worker-node-3 is under memory pressure with only 8% memory remaining"
+      },
+      "startsAt": "2026-06-29T10:10:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

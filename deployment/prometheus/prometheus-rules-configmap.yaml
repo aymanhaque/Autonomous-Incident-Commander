@@ -1,0 +1,240 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aic-prometheus-rules
+  namespace: aic-monitoring
+  labels:
+    app.kubernetes.io/part-of: aic
+data:
+  aic-alerts.yml: |
+    groups:
+
+      # ── Pod health ────────────────────────────────────────────────────────────
+      - name: aic-pod-alerts
+        rules:
+          - alert: OOMKilled
+            expr: |
+              kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Container killed due to OOM: {{ $labels.pod }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) was OOMKilled."
+
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total[15m]) * 900 > 10
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is crash looping: {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} (container {{ $labels.container }}, namespace {{ $labels.namespace }}) has restarted more than 10 times in the last 15 minutes."
+
+          - alert: ContainerRestartLimit
+            expr: |
+              increase(kube_pod_container_status_restarts_total[1h]) > 20
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Container has exceeded restart limit: {{ $labels.container }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has restarted more than 20 times in the last hour and may be in CrashLoopBackOff."
+
+          - alert: LivenessProbeFailure
+            expr: |
+              increase(kube_pod_container_status_restarts_total[10m]) > 4
+              AND on(namespace, pod, container)
+              kube_pod_container_status_last_terminated_reason{reason="Error"} == 1
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Container liveness probe is failing: {{ $labels.pod }}"
+              description: "Container {{ $labels.container }} liveness probe has failed more than 4 times in 10 minutes in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}). Kubernetes will continue restarting the container."
+
+          - alert: PodStuckPending
+            expr: |
+              kube_pod_status_phase{phase="Pending"} == 1
+            for: 20m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod stuck in Pending state: {{ $labels.pod }}"
+              description: "Pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has been in Pending state for over 20 minutes, likely due to insufficient resources or unschedulable constraints."
+
+      # ── Container resource pressure ───────────────────────────────────────────
+      - name: aic-container-resource-alerts
+        rules:
+          - alert: CPUThrottling
+            expr: |
+              rate(container_cpu_cfs_throttled_seconds_total{container!="", container!="POD"}[5m])
+                / rate(container_cpu_cfs_periods_total{container!="", container!="POD"}[5m]) > 0.80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Container CPU is being throttled: {{ $labels.container }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) is being throttled {{ $value | humanizePercentage }} of the time due to CPU limits."
+
+          - alert: HighCPUUsage
+            expr: |
+              rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])
+                / on(namespace, pod, container)
+                  kube_pod_container_resource_limits{resource="cpu"} > 0.90
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Container CPU usage is critically high: {{ $labels.container }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has been running above 90% of its CPU limit for over 10 minutes."
+
+          - alert: MemoryLeak
+            expr: |
+              predict_linear(container_memory_working_set_bytes{container!="", container!="POD"}[2h], 3600)
+                > container_spec_memory_limit_bytes{container!="", container!="POD"} * 0.90
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Container memory usage growing continuously: {{ $labels.container }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) memory is trending to exceed 90% of its limit within 1 hour, indicating a possible memory leak."
+
+      # ── Node conditions ───────────────────────────────────────────────────────
+      - name: aic-node-alerts
+        rules:
+          - alert: NodeMemoryPressure
+            expr: |
+              kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node memory pressure: {{ $labels.node }}"
+              description: "Node {{ $labels.node }} is reporting MemoryPressure."
+
+          - alert: NodeDiskPressure
+            expr: |
+              kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node disk pressure: {{ $labels.node }}"
+              description: "Node {{ $labels.node }} is reporting DiskPressure."
+
+      # ── Deployment / workload ─────────────────────────────────────────────────
+      - name: aic-deployment-alerts
+        rules:
+          - alert: ReplicaMismatch
+            expr: |
+              kube_deployment_spec_replicas - kube_deployment_status_replicas_available > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Deployment has fewer replicas than desired: {{ $labels.deployment }}"
+              description: "Deployment {{ $labels.deployment }} (namespace {{ $labels.namespace }}) has {{ $value }} fewer available replicas than desired."
+
+          - alert: DeploymentRolloutStuck
+            expr: |
+              kube_deployment_status_condition{condition="Progressing", status="false"} == 1
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Deployment rollout is stuck: {{ $labels.deployment }}"
+              description: "Deployment {{ $labels.deployment }} (namespace {{ $labels.namespace }}) rollout has been blocked and is not progressing for over 10 minutes."
+
+      # ── Service and network ───────────────────────────────────────────────────
+      - name: aic-service-network-alerts
+        rules:
+          - alert: ServiceUnavailable
+            expr: |
+              kube_endpoint_address_available == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service is completely unavailable: {{ $labels.endpoint }}"
+              description: "Service {{ $labels.endpoint }} (namespace {{ $labels.namespace }}) has no available endpoints and is returning errors on all requests."
+
+          - alert: GatewayTimeout
+            expr: |
+              rate(nginx_ingress_controller_requests{status=~"504"}[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "API Gateway returning 504 errors: {{ $labels.ingress }}"
+              description: "Ingress {{ $labels.ingress }} (service {{ $labels.service }}, namespace {{ $labels.namespace }}) has been returning 504 timeout errors at {{ $value | printf \"%.3f\" }} req/s for over 5 minutes."
+
+          - alert: HighErrorRate
+            expr: |
+              rate(http_requests_total{status_code=~"5.."}[10m])
+                / rate(http_requests_total[10m]) > 0.40
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service has high error rate: {{ $labels.service }}"
+              description: "Service {{ $labels.service }} (namespace {{ $labels.namespace }}) is returning 5xx errors on {{ $value | humanizePercentage }} of requests over the last 10 minutes."
+
+          - alert: IngressHighErrorRate
+            expr: |
+              rate(nginx_ingress_controller_requests{status=~"5.."}[5m])
+                / rate(nginx_ingress_controller_requests[5m]) > 0.50
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Ingress controller returning high error rate: {{ $labels.ingress }}"
+              description: "Ingress {{ $labels.ingress }} (namespace {{ $labels.namespace }}) is returning 5xx errors on {{ $value | humanizePercentage }} of requests over the last 5 minutes."
+
+          - alert: HighNetworkLatency
+            expr: |
+              histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Service experiencing high network latency: {{ $labels.service }}"
+              description: "Service {{ $labels.service }} (namespace {{ $labels.namespace }}) p99 latency is {{ $value | printf \"%.0f\" }}ms, exceeding the 2000ms threshold."
+
+          - alert: DatabaseConnectionFailed
+            expr: |
+              kube_pod_container_status_ready{container=~"postgres|mysql|mongodb|redis|mariadb"} == 0
+            for: 3m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database pod is not ready: {{ $labels.pod }}"
+              description: "Database container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }}) has not been ready for 3 minutes, causing downstream connection failures."
+
+      # ── Storage ───────────────────────────────────────────────────────────────
+      - name: aic-storage-alerts
+        rules:
+          - alert: PersistentVolumeFull
+            expr: |
+              kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.95
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Persistent volume is nearly full: {{ $labels.persistentvolumeclaim }}"
+              description: "PersistentVolumeClaim {{ $labels.persistentvolumeclaim }} (namespace {{ $labels.namespace }}) is {{ $value | humanizePercentage }} full."
+
+      # ── Namespace quotas ──────────────────────────────────────────────────────
+      - name: aic-namespace-alerts
+        rules:
+          - alert: NamespaceResourceQuotaExceeded
+            expr: |
+              kube_resourcequota{type="used"}
+                / on(namespace, resource) kube_resourcequota{type="hard"} > 0.90
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Namespace approaching resource quota limit: {{ $labels.namespace }}"
+              description: "Namespace {{ $labels.namespace }} has used {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota. New pods may fail to schedule."

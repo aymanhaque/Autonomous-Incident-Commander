@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: aic
+  labels:
+    app.kubernetes.io/part-of: aic
+    app: n8n
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      initContainers:
+        - name: import-workflows
+          image: docker.n8n.io/n8nio/n8n:2.27.4
+          command:
+            - n8n
+            - import:workflow
+            - --input=/workflows/aic-approval-gate.json
+          envFrom:
+            - secretRef:
+                name: aic-secrets
+            - configMapRef:
+                name: aic-config
+          volumeMounts:
+            - name: n8n-data
+              mountPath: /home/node/.n8n
+            - name: n8n-workflows
+              mountPath: /workflows
+              readOnly: true
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:2.27.4
+          ports:
+            - containerPort: 5678
+          envFrom:
+            - secretRef:
+                name: aic-secrets
+            - configMapRef:
+                name: aic-config
+          volumeMounts:
+            - name: n8n-data
+              mountPath: /home/node/.n8n
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5678
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5678
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: n8n-data
+          persistentVolumeClaim:
+            claimName: n8n-data
+        - name: n8n-workflows
+          configMap:
+            name: aic-n8n-workflows

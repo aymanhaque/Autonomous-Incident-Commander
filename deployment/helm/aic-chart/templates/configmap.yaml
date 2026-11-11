@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aic-config
+  namespace: {{ include "aic.namespace" . }}
+  labels:
+    {{- include "aic.labels" . | nindent 4 }}
+data:
+  FIRESTORE_PROJECT_ID: {{ .Values.config.firestoreProjectId | quote }}
+  FIRESTORE_CREDENTIALS_PATH: {{ .Values.config.firestoreCredentialsPath | quote }}
+  PROMETHEUS_URL: {{ .Values.config.prometheusUrl | quote }}
+  N8N_WEBHOOK_URL: {{ .Values.config.n8nWebhookUrl | quote }}
+  LANGGRAPH_API_URL: {{ .Values.config.langGraphApiUrl | quote }}
+  EXECUTION_API_URL: {{ .Values.config.executionApiUrl | quote }}
+  APPROVAL_API_URL: {{ .Values.config.approvalApiUrl | quote }}
+  WEBHOOK_URL: {{ .Values.config.webhookUrl | quote }}
+  N8N_HOST: {{ .Values.config.n8nHost | quote }}
+  N8N_PORT: "5678"
+  N8N_PROTOCOL: {{ .Values.config.n8nProtocol | quote }}
+  N8N_SECURE_COOKIE: {{ .Values.config.n8nSecureCookie | quote }}
+  N8N_RUNNERS_ENABLED: {{ .Values.config.n8nRunnersEnabled | quote }}
+  N8N_BLOCK_ENV_ACCESS_IN_NODE: {{ .Values.config.n8nBlockEnvAccess | quote }}
+  GENERIC_TIMEZONE: {{ .Values.config.genericTimezone | quote }}
+  TZ: {{ .Values.config.genericTimezone | quote }}
+  CORS_ALLOW_ORIGINS: {{ .Values.config.corsAllowOrigins | quote }}
+  REDIS_URL: "redis://redis:6379"

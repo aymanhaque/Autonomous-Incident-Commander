@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "DeploymentRolloutStuck",
+        "severity": "warning",
+        "namespace": "production",
+        "deployment": "inventory-service"
+      },
+      "annotations": {
+        "summary": "Deployment rollout has stalled",
+        "description": "Deployment inventory-service rollout has been stuck at 2/5 replicas updated for 15 minutes"
+      },
+      "startsAt": "2026-07-06T10:50:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

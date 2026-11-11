@@ -1,0 +1,20 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "NamespaceResourceQuotaExceeded",
+        "severity": "warning",
+        "namespace": "production"
+      },
+      "annotations": {
+        "summary": "Namespace is approaching resource quota limit",
+        "description": "Namespace production has used 95% of its CPU quota and 88% of its memory quota, new pods may fail to schedule"
+      },
+      "startsAt": "2026-07-06T10:55:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

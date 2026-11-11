@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodStuckPending",
+        "severity": "warning",
+        "namespace": "production",
+        "pod": "ml-worker-3d8f1a-xz9q2"
+      },
+      "annotations": {
+        "summary": "Pod stuck in Pending state",
+        "description": "Pod ml-worker-3d8f1a-xz9q2 has been in Pending state for 20 minutes due to insufficient resources"
+      },
+      "startsAt": "2026-07-06T10:05:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

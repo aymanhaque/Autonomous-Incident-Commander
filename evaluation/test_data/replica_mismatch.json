@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "ReplicaMismatch",
+        "severity": "critical",
+        "namespace": "production",
+        "deployment": "notification-service"
+      },
+      "annotations": {
+        "summary": "Deployment has fewer replicas than desired",
+        "description": "Deployment notification-service has 1 ready replica but 5 are desired, 4 pods are failing to start"
+      },
+      "startsAt": "2026-07-06T10:25:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

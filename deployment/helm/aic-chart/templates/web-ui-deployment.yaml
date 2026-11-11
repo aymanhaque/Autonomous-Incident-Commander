@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-ui
+  namespace: {{ include "aic.namespace" . }}
+  labels:
+    {{- include "aic.labels" . | nindent 4 }}
+    app: web-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-ui
+  template:
+    metadata:
+      labels:
+        app: web-ui
+    spec:
+      containers:
+        - name: web-ui
+          image: {{ .Values.images.webUi.repository }}:{{ .Values.images.webUi.tag }}
+          ports:
+            - containerPort: 3000
+          env:
+            # nginx injects this into the /approvals/ proxy Authorization header
+            # (see web-ui/nginx.conf) so the browser never holds the service
+            # token. Key must match the aic-secrets entry the approval-api reads
+            # via envFrom (API_SERVICE_TOKEN).
+            - name: APPROVAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aic-secrets
+                  key: API_SERVICE_TOKEN
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

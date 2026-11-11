@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "ContainerRestartLimit",
+        "severity": "critical",
+        "namespace": "production",
+        "pod": "search-service-9b3c7d-wy4u5",
+        "container": "search-service"
+      },
+      "annotations": {
+        "summary": "Container has exceeded restart limit",
+        "description": "Container search-service has restarted 25 times in the last hour and is now in CrashLoopBackOff"
+      },
+      "startsAt": "2026-07-06T10:30:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

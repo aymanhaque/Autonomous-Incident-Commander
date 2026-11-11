@@ -1,0 +1,12 @@
+# AIC Generic Approval API runtime deps. Pinned to match the repo-wide
+# orchestration/requirements.txt versions where they overlap.
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+firebase-admin>=6.4.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# --- test-only (kept here so the emulator CI job installs them) ---
+pytest>=8.2.0
+pytest-asyncio>=0.23.0

@@ -1,0 +1,21 @@
+{
+  "//": "AIC Firestore emulator config. The 'firestore' block wires the rules + indexes files into the emulator so it ENFORCES them exactly like prod. Without the rules key the emulator runs fully OPEN (allow all) and gives a false sense of security.",
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "//": "host MUST be 0.0.0.0 (not the 127.0.0.1 default) so other compose services and the host can reach the emulator over the compose network â€” the #1 Docker failure mode (firebase-tools issue #1976). LAN exposure is prevented at the HOST publish layer: docker-compose.yml binds the published ports to 127.0.0.1. These two settings are complementary: 0.0.0.0 = in-container bind; 127.0.0.1 = host-side bind.",
+    "firestore": {
+      "port": 8080,
+      "host": "0.0.0.0"
+    },
+    "ui": {
+      "//": "Free Emulator Suite UI: live data browser/editor + Rules Playground (for testing default-deny / immutable audit_log) + request monitor. Directly supports the security-audit deliverable. SECURITY NOTE (audit, low): the Suite UI is an UNAUTHENTICATED full read/write surface that bypasses firestore.rules â€” anyone who reaches :4000 can edit/delete any doc including audit_log. It must NEVER be published beyond 127.0.0.1 (the compose host bind enforces this). It has no prod analogue, so the only risk is dev-box exposure.",
+      "enabled": true,
+      "port": 4000,
+      "host": "0.0.0.0"
+    },
+    "singleProjectMode": true
+  }
+}

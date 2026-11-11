@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: execution
+  namespace: {{ include "aic.namespace" . }}
+  labels:
+    {{- include "aic.labels" . | nindent 4 }}
+    app: execution
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: execution
+  template:
+    metadata:
+      labels:
+        app: execution
+    spec:
+      containers:
+        - name: execution
+          image: {{ .Values.images.execution.repository }}:{{ .Values.images.execution.tag }}
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: aic-secrets
+            - configMapRef:
+                name: aic-config
+          volumeMounts:
+            - name: firestore-sa
+              mountPath: /app/secrets
+              readOnly: true
+            - name: tf-sandboxes
+              mountPath: /tmp/tf_sandboxes
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: firestore-sa
+          secret:
+            secretName: aic-secrets
+            items:
+              - key: FIRESTORE_SA_JSON
+                path: firestore-service-account.json
+        - name: tf-sandboxes
+          emptyDir: {}

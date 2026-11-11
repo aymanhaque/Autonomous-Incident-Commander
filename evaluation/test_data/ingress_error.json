@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "IngressHighErrorRate",
+        "severity": "critical",
+        "namespace": "production",
+        "ingress": "main-ingress",
+        "service": "frontend"
+      },
+      "annotations": {
+        "summary": "Ingress controller returning high error rate",
+        "description": "Ingress main-ingress is returning 5xx errors on 60% of requests for the past 5 minutes"
+      },
+      "startsAt": "2026-07-06T10:40:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

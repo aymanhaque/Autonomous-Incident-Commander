@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aic-chart
+description: Autonomous Incident Commander — full stack (agent, execution, redis, n8n, prometheus, web-ui, approval-api)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

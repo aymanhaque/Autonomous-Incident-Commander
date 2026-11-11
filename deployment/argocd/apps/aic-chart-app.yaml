@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aic-chart
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AlexGandarilla/Autonomous-Incident-Commander-Project
+    targetRevision: main
+    path: deployment/helm/aic-chart
+    helm:
+      valueFiles:
+        - values.yaml
+        # secrets.values.yaml is intentionally excluded — aic-secrets is pre-created
+        # via bootstrap.sh and managed outside of ArgoCD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aic
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

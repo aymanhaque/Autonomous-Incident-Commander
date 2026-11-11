@@ -1,0 +1,228 @@
+rules_version = '2';
+// =============================================================================
+// AIC Firestore Security Rules  (post-security-audit, Week 4 final)
+// =============================================================================
+// WHAT THESE RULES PROTECT:
+//   These rules bind ONLY traffic that uses a client SDK + a Firebase Auth ID
+//   token (the future React/Streamlit Web UI, Route A) and the Firestore
+//   console / Emulator Suite client path. They are the SECOND line of defense
+//   for the system and the ONLY defense for any direct-client access.
+//
+// WHAT THESE RULES DO **NOT** PROTECT (read this):
+//   Tarik's Generic Approval API runs server-side with the Firebase Admin SDK,
+//   which BYPASSES all security rules unconditionally. So:
+//     - The API can read/write/delete anything regardless of the rules below.
+//     - The SAME invariants (status starts 'pending'; only pending ->
+//       approved/denied; immutable fields frozen; only an authorized approver
+//       may decide; audit_log never mutated; actor == verified caller) MUST
+//       ALSO be enforced in the API code. The rules and the API are two
+//       independent enforcement points for the same contract. The Admin-SDK
+//       invariants are NOT self-enforcing here â€” they must be backed by:
+//         (1) regression tests (Elias) that attempt update/delete on audit_log
+//             and field-unfreezing on a decided approval and assert rejection;
+//         (2) a dedicated, least-privilege API service account;
+//         (3) Firestore PITR / scheduled exports to an append-only,
+//             retention-locked bucket so Admin-SDK tampering is recoverable.
+//     - Route B deciders (curl/Slack/Teams/PagerDuty) have NO request.auth at
+//       all; their authorization is enforced entirely in the API layer.
+//
+// POST-AUDIT POSTURE (the important change):
+//   The client path is now CLOSED for writes and for reading approvals.
+//   - approvals: NO client get/list (n8n.resume_webhook_url is a bearer
+//     capability; field-level redaction is impossible in rules, so the whole
+//     doc is hidden). NO client create. Client UPDATE is the only client write,
+//     tightly constrained to the pending->approved/denied decision by a real
+//     approver, with a changedKeys() allowlist so nothing else can move.
+//   - audit_log: client create is DENIED (actor was forgeable); the Admin-SDK
+//     API is the sole writer. Clients may still read the trail for the Web UI.
+//   All client reads of approvals go through the API (GET /approvals/pending),
+//   which strips the n8n map before returning anything to a browser.
+//
+// Field naming is snake_case to match the data model (SCHEMA.md) and the API.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helper functions --------------------------------------------------
+    // Single return expression each; used to DRY up the conditions below.
+
+    // Is the caller authenticated with a Firebase Auth ID token at all?
+    // Gating on this FIRST is required: request.auth is null for anonymous
+    // callers, so touching request.auth.token.* without this check throws/denies.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Is the caller an authorized human approver?
+    // Approver identity is granted via a custom claim set server-side with the
+    // Admin SDK (setCustomUserClaims). Swap for an allowlist if you prefer:
+    //   exists(/databases/$(database)/documents/approvers/$(request.auth.uid))
+    function isApprover() {
+      return isSignedIn() && request.auth.token.approver == true;
+    }
+
+    // -------------------------------------------------------------------------
+    // approvals â€” the human-in-the-loop gate records
+    // -------------------------------------------------------------------------
+    match /approvals/{approvalId} {
+
+      // READ: DENIED for clients.
+      // AUDIT FIX (critical): the previous `allow get, list: if isSignedIn()`
+      // exposed n8n.resume_webhook_url â€” a bearer capability that, when POSTed
+      // to, resumes the paused n8n execution and triggers the Terraform apply.
+      // Any signed-in non-approver could read it and bypass isApprover(), the
+      // decide endpoint, and the audit_log entirely. Field-level redaction is
+      // impossible in rules, so the entire approval doc is hidden from clients.
+      // The Web UI reads pending plans via GET /approvals/pending, which strips
+      // the n8n map server-side before returning. If a dev-only direct emulator
+      // read is ever needed, gate it behind the emulator ONLY and never ship it.
+      allow get, list: if false;
+
+      // CREATE: DENIED for clients.
+      // AUDIT FIX (medium/high): the previous create rule allowed any signed-in
+      // user to mint approval gates (queue flooding) and, because hasAll() does
+      // not bound the key set, to pre-inject decided_by/decided_at/decision_*
+      // and an attacker-controlled n8n.resume_webhook_url (SSRF / planted
+      // capability) that the freeze checks would then carry forward unchanged.
+      // The only legitimate creator is the Admin-SDK API (POST /approvals),
+      // which bypasses rules. So direct-client creation is not supported.
+      // The data contract for creation is documented in SCHEMA.md and enforced
+      // in the API; see the commented reference contract below for the shape
+      // the API must validate server-side.
+      //
+      //   keys().hasOnly(['approval_id','status','plan_format','plan_summary',
+      //     'plan_inline','plan_ref','plan_hash','risk','risk_rationale',
+      //     'remediation_summary','alert_type','alert_payload','alert_fingerprint',
+      //     'incident_id','n8n','created_at','expires_at','schema_version'])
+      //   && keys().hasAll(['approval_id','status','plan_format','plan_summary',
+      //     'plan_hash','risk','alert_type','alert_payload','incident_id',
+      //     'n8n','created_at','schema_version'])
+      //   && status == 'pending'
+      //   && !keys().hasAny(['decided_at','decided_by','decision_channel',
+      //     'decision_note'])
+      //   && created_at == request.time   (FieldValue.serverTimestamp())
+      allow create: if false;
+
+      // UPDATE: the controlled state transition â€” the ONLY client write allowed.
+      // Only a real approver, only the pending -> approved/denied move, and ONLY
+      // the decision fields may change. request.resource.data on update is the
+      // FULL post-write doc, so we (a) whitelist exactly which keys may change
+      // with changedKeys().hasOnly(...) and (b) additionally pin every frozen
+      // field old == new as defense-in-depth. Together these make the plan /
+      // alert / provenance immutable AFTER a decision and forbid injecting new
+      // arbitrary keys in the same write.
+      allow update: if isApprover()
+        // Source state must be pending (blocks pending->pending no-ops and any
+        // re-decision of an already-decided approval -> idempotency at the rules
+        // layer; also blocks client jumps to executing/executed/expired/etc.).
+        && resource.data.status == 'pending'
+        // Target state is exactly one of the two terminal decisions.
+        && request.resource.data.status in ['approved', 'denied']
+        // ---- AUDIT FIX (high): allowlist the ONLY keys permitted to change. --
+        // Anything not in this set must be identical to its pre-write value, and
+        // no brand-new keys may appear. The API decide transaction mirrors this.
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(
+             ['status', 'decided_by', 'decided_at', 'decision_channel', 'decision_note'])
+        // ---- frozen / immutable fields (full plan + alert + provenance) -----
+        // AUDIT FIX (high): previously only a subset was pinned, letting an
+        // approver rewrite plan_inline/plan_ref/plan_format/risk_rationale/etc.
+        // at decision time while plan_hash stayed frozen (tamper-evidence
+        // defeat). Every non-decision field is now pinned old == new.
+        && request.resource.data.approval_id       == resource.data.approval_id
+        && request.resource.data.plan_format        == resource.data.plan_format
+        && request.resource.data.plan_summary       == resource.data.plan_summary
+        && request.resource.data.plan_inline        == resource.data.plan_inline
+        && request.resource.data.plan_ref           == resource.data.plan_ref
+        && request.resource.data.plan_hash          == resource.data.plan_hash
+        && request.resource.data.risk               == resource.data.risk
+        && request.resource.data.risk_rationale     == resource.data.risk_rationale
+        && request.resource.data.remediation_summary == resource.data.remediation_summary
+        && request.resource.data.alert_type         == resource.data.alert_type
+        && request.resource.data.alert_payload      == resource.data.alert_payload
+        && request.resource.data.alert_fingerprint  == resource.data.alert_fingerprint
+        && request.resource.data.incident_id        == resource.data.incident_id
+        && request.resource.data.n8n                == resource.data.n8n
+        && request.resource.data.created_at         == resource.data.created_at
+        && request.resource.data.expires_at         == resource.data.expires_at
+        && request.resource.data.schema_version     == resource.data.schema_version
+        // ---- decision fields: who decided + when, set to verified values ----
+        && request.resource.data.decided_by == request.auth.uid
+        && request.resource.data.decided_at == request.time
+        // ---- AUDIT FIX (high): pin the channel for the client/Web-UI path. ---
+        // Route A decisions come from the web, so the client cannot forge a
+        // 'slack'/'pagerduty' provenance. Route B channels are set server-side
+        // by the Admin-SDK API (which bypasses these rules).
+        && request.resource.data.decision_channel == 'web'
+        // decision_note is optional; if present it must be a string.
+        && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['decision_note'])
+            || request.resource.data.decision_note is string);
+
+      // DELETE: approvals are an audit trail â€” never deletable from a client.
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // audit_log â€” APPEND-ONLY / IMMUTABLE / SERVER-WRITTEN
+    // -------------------------------------------------------------------------
+    // Immutability requires denying BOTH update AND delete. Allowing create
+    // alone is not enough, and we must never grant a broad `allow write` here or
+    // it re-enables update/delete. (Reminder: the Admin SDK bypasses all of
+    // this, so the API must also never update/delete audit rows â€” see the
+    // header for the tests/IAM/PITR controls that back that promise.)
+    match /audit_log/{entryId} {
+
+      // READ: signed-in users can view the trail in the Web UI.
+      allow get, list: if isSignedIn();
+
+      // CREATE: DENIED for clients.
+      // AUDIT FIX (critical/high): the previous create rule let any signed-in
+      // user append rows with a self-chosen `actor` and any `event_type`,
+      // fabricating clean-looking 'approval_approved' history (append-only is
+      // not tamper-EVIDENT if lies can be appended). The legitimate writer is
+      // the Admin-SDK API, which sets actor from the authenticated decide caller
+      // inside the same transaction as the status flip. So the client cannot
+      // write audit rows at all.
+      // The API-side contract (enforced in code, bypassing rules):
+      //   - actor == the verified decide caller (uid/email/service), never
+      //     client-chosen;
+      //   - event_type in the documented enum;
+      //   - timestamp == FieldValue.serverTimestamp();
+      //   - written atomically with the corresponding approvals change;
+      //   - optional prev_hash/entry_hash chain for tamper-evidence.
+      allow create: if false;
+
+      // The two lines that make audit_log tamper-evident at the rules layer:
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // test_results (Elias) -- evaluation records, one per test case per run
+    // -------------------------------------------------------------------------
+    // The evaluation harness/CI writes these via the server-side google-cloud
+    // Firestore client (Cloud API path -> owner -> bypasses these rules), the
+    // same privileged path the Approval API uses. So client create/update/delete
+    // are DENIED: a browser can never forge or edit a test result, but the
+    // harness (and the Streamlit dashboard, if it reads via a client SDK) still
+    // works. Rows are append-only so the dashboard can chart accuracy over time.
+    // Schema + a runnable writer example: orchestration/firestore/test_results/.
+    match /test_results/{resultId} {
+      allow get, list: if isSignedIn();   // dashboard read
+      allow create: if false;             // harness writes via the owner/Cloud path
+      allow update: if false;             // append-only
+      allow delete: if false;             // append-only
+    }
+
+    // -------------------------------------------------------------------------
+    // default deny â€” everything not explicitly allowed above is denied
+    // -------------------------------------------------------------------------
+    // Rules are deny-by-default, but this catch-all makes the baseline explicit
+    // and self-documenting. Any new collection is locked until a match block
+    // grants access. Keep this block LAST and never precede it with a broad
+    // allow.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

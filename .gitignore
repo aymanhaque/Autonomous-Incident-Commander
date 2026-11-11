@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+secrets/
+*.json.secret
+
+# Service-account / credential keys -- NEVER commit (belt-and-suspenders so a
+# rotated key or a stray adminsdk JSON cannot land in history by accident)
+*serviceAccount*.json
+*service-account*.json
+*adminsdk*.json
+*-key.json
+*.pem
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+crash.log
+
+# Node / n8n / React
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Evaluation reports (generated, not tracked)
+evaluation/reports/*.json
+evaluation/reports/*.html
+
+# Helm secrets
+deployment/helm/aic-chart/secrets.values.yaml
+execution/helm/aic-chart/secrets.yaml
+
+# Emulator debug logs
+firestore-debug.log
+ui-debug.log
+*-debug.log

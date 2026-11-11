@@ -1,0 +1,9 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+python-dotenv>=1.0.0
+firebase-admin>=6.4.0
+prometheus-api-client>=0.5.4
+redis>=5.0.0
+httpx>=0.27.0
+python-terraform>=0.10.1

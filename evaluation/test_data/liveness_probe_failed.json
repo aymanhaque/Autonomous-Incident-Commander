@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "LivenessProbeFailure",
+        "severity": "critical",
+        "namespace": "production",
+        "pod": "shipping-service-7e2f4b-ab8c9",
+        "container": "shipping-service"
+      },
+      "annotations": {
+        "summary": "Container liveness probe is failing",
+        "description": "Container shipping-service liveness probe has failed 5 consecutive times, Kubernetes will restart the container"
+      },
+      "startsAt": "2026-07-06T11:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

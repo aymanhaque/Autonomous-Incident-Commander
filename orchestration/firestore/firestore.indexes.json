@@ -1,0 +1,43 @@
+{
+  "//": "AIC composite indexes. Committed so the emulator and prod stay in sync. In the emulator, queries auto-index, but PROD throws FAILED_PRECONDITION until the index exists â€” so the GET /approvals/pending query is declared here explicitly.",
+  "indexes": [
+    {
+      "//": "Backs GET /approvals/pending: where('status','==','pending').orderBy('created_at'). An equality filter combined with an orderBy on a DIFFERENT field requires a composite index; a single-field index is insufficient.",
+      "collectionGroup": "approvals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "Optional: backs the pending list ALSO filtered by risk (e.g. show High first). Safe to keep; remove if the UI never filters by risk.",
+      "collectionGroup": "approvals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "risk", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "test_results (Elias): one run's detail — where('run_id','==',X).orderBy('created_at').",
+      "collectionGroup": "test_results",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "run_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "test_results (Elias): failure/accuracy trend per alert type — where('alert_type','==',X).orderBy('created_at' DESC).",
+      "collectionGroup": "test_results",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "alert_type", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

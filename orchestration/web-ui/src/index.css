@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+/* ── Light mode (default) ─────────────────────────────────────────── */
+:root {
+  --bg-primary:   #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-elevated:  #FFFFFF;
+  --bg-tertiary:  #F1F5F9;
+
+  --text-primary:   #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary:  #94A3B8;
+
+  --border: #E2E8F0;
+
+  --accent-50:  #EFF6FF;
+  --accent-500: #3B82F6;
+  --accent-600: #2563EB;
+  --accent-700: #1D4ED8;
+
+  --success-50:  #F0FDF4;
+  --success-500: #22C55E;
+  --success-600: #16A34A;
+
+  --warning-50:  #FFFBEB;
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
+
+  --danger-50:  #FEF2F2;
+  --danger-500: #EF4444;
+  --danger-600: #DC2626;
+}
+
+/* ── Dark mode (VS Code Dark+ palette) ────────────────────────────── */
+.dark {
+  --bg-primary:   #1e1e1e;   /* editor.background */
+  --bg-secondary: #252526;   /* sideBar.background */
+  --bg-elevated:  #2d2d2d;   /* tab inactive / panel */
+  --bg-tertiary:  #3c3c3c;   /* input.background */
+
+  --text-primary:   #d4d4d4; /* editor.foreground */
+  --text-secondary: #9d9d9d; /* descriptionForeground */
+  --text-tertiary:  #6e6e6e; /* comments / muted */
+
+  --border: #454545;         /* editorGroup.border */
+
+  --accent-50:  #0d2137;     /* dark blue tint for subtle backgrounds */
+  --accent-500: #007acc;     /* focusBorder / statusBar blue */
+  --accent-600: #4fc3f7;     /* brighter blue for text links */
+  --accent-700: #81d4fa;     /* lightest blue for hover states */
+
+  --success-50:  #0a2219;
+  --success-500: #4ec9b0;    /* VS Code teal (type / class names) */
+  --success-600: #89d185;    /* lighter green for text */
+
+  --warning-50:  #2a1f00;
+  --warning-500: #cca700;    /* VS Code warning squiggle color */
+  --warning-600: #ffcc00;    /* brighter for warning text */
+
+  --danger-50:  #280d0d;
+  --danger-500: #f44747;     /* VS Code error color */
+  --danger-600: #f48771;     /* VS Code warning-level red/orange */
+}
+
+/* ── Accent variants ──────────────────────────────────────────────── */
+[data-accent="indigo"] {
+  --accent-50:  #EEF2FF;
+  --accent-500: #6366F1;
+  --accent-600: #4F46E5;
+  --accent-700: #4338CA;
+}
+.dark[data-accent="indigo"] {
+  --accent-50:  #312E81;
+  --accent-500: #6366F1;
+  --accent-600: #818CF8;
+  --accent-700: #A5B4FC;
+}
+
+[data-accent="emerald"] {
+  --accent-50:  #ECFDF5;
+  --accent-500: #10B981;
+  --accent-600: #059669;
+  --accent-700: #047857;
+}
+.dark[data-accent="emerald"] {
+  --accent-50:  #022C22;
+  --accent-500: #10B981;
+  --accent-600: #34D399;
+  --accent-700: #6EE7B7;
+}
+
+/* ── Tailwind v4 theme registration ──────────────────────────────── */
+@theme {
+  --color-bg-primary:   var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-elevated:  var(--bg-elevated);
+  --color-bg-tertiary:  var(--bg-tertiary);
+
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary:  var(--text-tertiary);
+
+  --color-border: var(--border);
+
+  --color-accent-50:  var(--accent-50);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+
+  --color-success-50:  var(--success-50);
+  --color-success-500: var(--success-500);
+  --color-success-600: var(--success-600);
+
+  --color-warning-50:  var(--warning-50);
+  --color-warning-500: var(--warning-500);
+  --color-warning-600: var(--warning-600);
+
+  --color-danger-50:  var(--danger-50);
+  --color-danger-500: var(--danger-500);
+  --color-danger-600: var(--danger-600);
+}
+
+/* ── Global base ──────────────────────────────────────────────────── */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shiki dual-theme for HCL viewer (static + line numbers) ─────── */
+.hcl-viewer .shiki {
+  background: transparent !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+.hcl-viewer .shiki span {
+  color: var(--shiki-light);
+}
+html.dark .hcl-viewer .shiki span {
+  color: var(--shiki-dark);
+}
+.hcl-viewer .shiki code {
+  display: block;
+  counter-reset: shiki-line;
+}
+.hcl-viewer .shiki .line {
+  display: block;
+  white-space: pre;
+  padding-left: 3.75rem;
+  position: relative;
+  min-height: 1.5em;
+}
+.hcl-viewer .shiki .line::before {
+  counter-increment: shiki-line;
+  content: counter(shiki-line);
+  position: absolute;
+  left: 0;
+  width: 3.25rem;
+  text-align: right;
+  padding-right: 0.75rem;
+  color: var(--text-tertiary);
+  opacity: 0.4;
+  font-size: 0.8em;
+  line-height: 1.875;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Streaming HCL with live syntax highlighting + line numbers ─── */
+.streaming-hcl .shiki {
+  background: transparent !important;
+  /* normalize whitespace so the \n between .line spans doesn't render */
+  white-space: normal !important;
+  overflow: visible !important;
+}
+.streaming-hcl .shiki span {
+  color: var(--shiki-light);
+}
+html.dark .streaming-hcl .shiki span {
+  color: var(--shiki-dark);
+}
+.streaming-hcl .shiki code {
+  display: block;
+  counter-reset: shiki-line;
+}
+.streaming-hcl .shiki .line {
+  display: block;
+  white-space: pre;          /* preserve indentation within each line */
+  padding-left: 3.75rem;
+  position: relative;
+  min-height: 1.5em;
+}
+.streaming-hcl .shiki .line::before {
+  counter-increment: shiki-line;
+  content: counter(shiki-line);
+  position: absolute;
+  left: 0;
+  width: 3.25rem;
+  text-align: right;
+  padding-right: 0.75rem;
+  color: var(--text-tertiary);
+  opacity: 0.4;
+  font-size: 0.8em;
+  line-height: 1.875;       /* vertically align with code text */
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Scrollbars – shared geometry ────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ── Scrollbar colors – light mode ───────────────────────────────── */
+* {
+  scrollbar-color: #c1c1c1 transparent;
+}
+::-webkit-scrollbar-thumb          { background-color: #c1c1c1; }
+::-webkit-scrollbar-thumb:hover    { background-color: #a8a8a8; }
+::-webkit-scrollbar-thumb:active   { background-color: #8f8f8f; }
+
+/* ── Scrollbar colors – dark mode (VS Code Dark+) ────────────────── */
+.dark * {
+  scrollbar-color: #424242 transparent;
+}
+.dark ::-webkit-scrollbar-thumb          { background-color: #424242; }
+.dark ::-webkit-scrollbar-thumb:hover    { background-color: #5a5a5a; }
+.dark ::-webkit-scrollbar-thumb:active   { background-color: #686868; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

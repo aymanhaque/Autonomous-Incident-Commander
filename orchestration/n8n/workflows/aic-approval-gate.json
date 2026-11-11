@@ -1,0 +1,221 @@
+{
+  "id": "AicApprovalGate1",
+  "name": "AIC Approval Gate",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aic",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-780, 0],
+      "webhookId": "aic-alert-intake"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body ?? {};\nconst alert = Array.isArray(body.alerts) && body.alerts.length ? body.alerts[0] : null;\nconst alertType = body.alert_type ?? alert?.labels?.alertname ?? 'Unknown';\nreturn {\n  alert_type: alertType,\n  alert_payload: alert ?? body,\n  alert_fingerprint: alert?.fingerprint ?? null,\n  incident_id: `inc_${$execution.id}`\n};"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Normalize Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LANGGRAPH_API_URL }}/generate-plan",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ alerts: [$json.alert_payload] }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Generate Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-340, 0],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 10000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const plan = $json;\n\n// Agent returns risk_score: 'Low' | 'Medium' | 'High'\n// Approval API Risk enum: 'Low' | 'Med' | 'High'\nconst riskMap = { Low: 'Low', Medium: 'Med', High: 'High' };\nconst risk = riskMap[plan.risk_score] ?? plan.risk_score ?? 'High';\n\nconst planText = plan.terraform_plan ?? '';\n\n// plan_hash is computed by the agent ('sha256:<hex>' per SCHEMA.md) and passed\n// through here -- the n8n Code node cannot use the crypto builtin without\n// NODE_FUNCTION_ALLOW_BUILTIN.\n\n// plan_summary is required (min_length=1); prefer remediation_summary, fall back to risk_reason\nconst planSummary =\n  (plan.remediation_summary && plan.remediation_summary.trim().length > 0)\n    ? plan.remediation_summary.trim()\n    : (plan.risk_reason && plan.risk_reason.trim().length > 0)\n      ? plan.risk_reason.trim()\n      : (plan.alert_name ? plan.alert_name + ' remediation plan' : 'Remediation plan');\n\nreturn {\n  plan_format: 'hcl',\n  plan_inline: planText || null,\n  plan_summary: planSummary,\n  plan_hash: plan.plan_hash,\n  risk: risk,\n  risk_rationale: plan.risk_reason ?? null,\n  remediation_summary: plan.remediation_summary ?? null,\n  error: plan.error ?? null,\n  validation_passed: plan.validation_passed ?? false,\n};"
+      },
+      "id": "a1000000-0000-4000-8000-000000000011",
+      "name": "Map Plan Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-230, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APPROVAL_API_URL }}/approvals",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.API_SERVICE_TOKEN }}" },
+            { "name": "X-Actor", "value": "n8n-orchestrator" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  plan_format: $json.plan_format,\n  plan_summary: $json.plan_summary,\n  plan_inline: $json.plan_inline,\n  plan_hash: $json.plan_hash,\n  risk: $json.risk,\n  risk_rationale: $json.risk_rationale,\n  remediation_summary: $json.remediation_summary,\n  alert_type: $('Normalize Alert').item.json.alert_type,\n  alert_payload: $('Normalize Alert').item.json.alert_payload,\n  alert_fingerprint: $('Normalize Alert').item.json.alert_fingerprint,\n  incident_id: $('Normalize Alert').item.json.incident_id,\n  n8n: {\n    execution_id: String($execution.id),\n    resume_webhook_url: $execution.resumeUrl,\n    resume_method: 'POST',\n    workflow_id: String($workflow.id)\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Create Approval Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c3000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $('Map Plan Fields').item.json.risk }}",
+              "rightValue": "High",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "High Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [60, 0]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Wait For Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [280, -100],
+      "webhookId": "aic-decision-resume"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APPROVAL_API_URL }}/approvals/{{ $('Create Approval Gate').item.json.approval_id }}/decide",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.API_SERVICE_TOKEN }}" },
+            { "name": "X-Actor", "value": "n8n-auto-policy" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  decision: 'approve',\n  decision_channel: 'api',\n  decision_note: 'Auto-approved: ' + $('Map Plan Fields').item.json.risk + ' risk plan does not require human review per policy.'\n}) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000010",
+      "name": "Auto-Decide (Low/Med)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [280, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.body.decision }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [320, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EXECUTION_API_URL }}/apply",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ plan_inline: $('Map Plan Fields').item.json.plan_inline, incident_id: $('Normalize Alert').item.json.incident_id }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Apply Fix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [560, -100],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 10000
+    },
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Denied - Abort",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [560, 100]
+    }
+  ],
+  "connections": {
+    "Alert Webhook": { "main": [[{ "node": "Normalize Alert", "type": "main", "index": 0 }]] },
+    "Normalize Alert": { "main": [[{ "node": "Generate Plan", "type": "main", "index": 0 }]] },
+    "Generate Plan": { "main": [[{ "node": "Map Plan Fields", "type": "main", "index": 0 }]] },
+    "Map Plan Fields": { "main": [[{ "node": "Create Approval Gate", "type": "main", "index": 0 }]] },
+    "Create Approval Gate": { "main": [[{ "node": "High Risk?", "type": "main", "index": 0 }]] },
+    "High Risk?": {
+      "main": [
+        [{ "node": "Wait For Decision", "type": "main", "index": 0 }],
+        [{ "node": "Auto-Decide (Low/Med)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Wait For Decision": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
+    "Approved?": {
+      "main": [
+        [{ "node": "Apply Fix", "type": "main", "index": 0 }],
+        [{ "node": "Denied - Abort", "type": "main", "index": 0 }]
+      ]
+    },
+    "Auto-Decide (Low/Med)": { "main": [[{ "node": "Apply Fix", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "active": false
+}

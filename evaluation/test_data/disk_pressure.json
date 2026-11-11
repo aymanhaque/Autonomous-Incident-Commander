@@ -1,0 +1,21 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "NodeDiskPressure",
+        "severity": "critical",
+        "namespace": "production",
+        "node": "worker-node-1"
+      },
+      "annotations": {
+        "summary": "Node is under disk pressure",
+        "description": "Node worker-node-1 has only 5% disk space remaining"
+      },
+      "startsAt": "2026-06-29T10:20:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

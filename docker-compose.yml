@@ -1,0 +1,214 @@
+# Top-level AIC stack: agent (JP) + execution/redis/prometheus (Ayman) +
+# n8n/firestore/web-ui (Tarik). `version:` removed — obsolete in Compose v2.
+#
+# Default:                docker compose up --build      (real Firestore)
+# Free-tier-safe dev:     docker compose --profile emulator up --build
+#                         (adds the local Firestore emulator; set
+#                          FIRESTORE_EMULATOR_HOST=firestore:8080 in .env)
+
+services:
+  agent:
+    build: ./agent
+    ports:
+      - "8001:8001"
+    env_file: .env
+    networks:
+      - aic
+
+  execution:
+    build: ./execution
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - redis
+      - agent
+    networks:
+      - aic
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - aic
+
+  # --- n8n: orchestration engine (Tarik) -------------------------------------
+  # WEEK-4 FIXES by the orchestration owner (the previous block was broken):
+  #   * Pinned the image. Was `n8nio/n8n:latest` — unpinned, so a restart could
+  #     silently pull a breaking release. Bump deliberately after the changelog.
+  #   * Removed N8N_BASIC_AUTH_ACTIVE/USER/PASSWORD. Those env vars were REMOVED
+  #     in n8n 1.0 and do NOTHING in 2.x — the stack only LOOKED authenticated.
+  #     n8n 2.x uses owner-account user management: on first boot open
+  #     http://localhost:5678 and create the owner account (claim it promptly).
+  #   * Set WEBHOOK_URL / N8N_HOST / N8N_PROTOCOL. n8n derives "Wait for Webhook"
+  #     RESUME URLs from these. Default base is http://n8n:5678/ so the Approval
+  #     API (approval_api container, same `aic` network) can POST the resume URL
+  #     to wake the paused execution. Without this the approve/deny -> resume
+  #     mechanic — the core of the orchestration — does not work.
+  #     (For manual host-side curl testing before the API exists, override
+  #      WEBHOOK_URL=http://localhost:5678/ in .env.)
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.27.4
+    ports:
+      - "5678:5678"
+    env_file: .env
+    environment:
+      - N8N_HOST=${N8N_HOST:-n8n}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://n8n:5678/}
+      # Stable key so stored credentials survive restarts. Generate one:
+      #   openssl rand -hex 16   ->  put in .env as N8N_ENCRYPTION_KEY
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-}
+      # false for plain-HTTP localhost dev; set true behind HTTPS.
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
+      - N8N_RUNNERS_ENABLED=true
+      # The approval-gate workflow reads LANGGRAPH_API_URL / APPROVAL_API_URL /
+      # EXECUTION_API_URL / API_SERVICE_TOKEN via $env expressions so service
+      # targets are configured in .env, not hardcoded in the workflow. n8n 2.x
+      # denies $env in expressions unless this is explicitly allowed.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/New_York}
+      - TZ=${GENERIC_TIMEZONE:-America/New_York}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # Version-controlled workflow EXPORTS live here (orchestration/n8n/).
+      # n8n does NOT auto-import from this folder; import once with
+      #   docker compose exec n8n n8n import:workflow --separate \
+      #     --input=/home/node/.n8n/workflows
+      # See orchestration/n8n/README.md. Read-only so the container can't
+      # mutate the committed exports.
+      - ./orchestration/n8n:/home/node/.n8n/workflows:ro
+    networks:
+      - aic
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./execution/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - aic
+
+  dui:
+    build: ./orchestration/web-ui
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      - execution
+    networks:
+      - aic
+
+  # --- Generic Approval API (Tarik) -----------------------------------------
+  # The human-in-the-loop gate. n8n POSTs pending approvals here; Route A (Web UI)
+  # and Route B (curl/Slack/Teams/PagerDuty) both decide via this API, which then
+  # resumes the paused n8n workflow. Runs under the Admin SDK, so it re-enforces
+  # every firestore.rules invariant IN CODE (the SDK bypasses the rules).
+  # Emulator dev: set FIRESTORE_EMULATOR_HOST=firestore:8080 in .env (emulator profile).
+  # Write endpoints require `Authorization: Bearer $API_SERVICE_TOKEN` and fail
+  # CLOSED (503) in non-emulator mode if the token is unset. Host 8090 -> container
+  # 8080 (8080 is used by the emulator).
+  approval_api:
+    build: ./orchestration/approval_api
+    ports:
+      - "8090:8080"
+    env_file: .env
+    volumes:
+      - ./secrets:/app/secrets:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aic
+
+  # --- Firestore emulator (Tarik) — OPTIONAL, free-tier-safe local dev -------
+  # NOT started by default (the `emulator` profile gates it), so the team's
+  # plain `docker compose up` is unchanged. Start the emulator path with:
+  #   docker compose --profile emulator up --build
+  # then set FIRESTORE_EMULATOR_HOST=firestore:8080 in .env so agent/execution/
+  # approval_api talk to the emulator instead of real GCP — no service-account
+  # JSON, no cloud spend. The emulator LOADS AND ENFORCES firestore.rules
+  # exactly like production (test them in the Suite UI Rules Playground).
+  # Host ports bound to 127.0.0.1: the emulator REST API (8080) and Suite UI
+  # (4000) are UNAUTHENTICATED full read/write surfaces that BYPASS the rules —
+  # never expose them beyond localhost.
+  firestore:
+    profiles: ["emulator"]
+    build:
+      context: ./orchestration/firestore/firestore-emulator
+    ports:
+      - "127.0.0.1:8080:8080"   # Firestore API
+      - "127.0.0.1:4000:4000"   # Emulator Suite UI (data browser + Rules Playground)
+    environment:
+      - GCLOUD_PROJECT=${FIRESTORE_PROJECT_ID:-aic-local}
+    volumes:
+      - ./orchestration/firestore/firebase.json:/firebase/firebase.json:ro
+      - ./orchestration/firestore/firestore.rules:/firebase/firestore.rules:ro
+      - ./orchestration/firestore/firestore.indexes.json:/firebase/firestore.indexes.json:ro
+      - firestore_data:/firebase/data
+    # Start command is the image's conditional script (imports prior data only
+    # if an export exists, so the first run can't crash). See
+    # orchestration/firestore/firestore-emulator/start-emulator.sh
+    networks:
+      - aic
+
+  # --- Mock LangGraph + execution (Tarik) — run the loop before JP/Muhd finish -
+  # OPT-IN via the `mocks` profile. They stand in for agent/ (JP) and execution/
+  # (Ayman) so the full alert -> plan -> approve -> resume -> apply loop runs end
+  # to end today. To use them, point n8n at the mocks in .env:
+  #   LANGGRAPH_API_URL=http://mock-langgraph:8001
+  #   EXECUTION_API_URL=http://mock-execution:8000
+  # Start everything for a full local demo:
+  #   docker compose --profile emulator --profile mocks up --build
+  mock-langgraph:
+    profiles: ["mocks"]
+    build:
+      context: ./orchestration/mocks
+      dockerfile: Dockerfile.langgraph
+    ports:
+      - "8011:8001"
+    networks:
+      - aic
+
+  mock-execution:
+    profiles: ["mocks"]
+    build:
+      context: ./orchestration/mocks
+      dockerfile: Dockerfile.execution
+    ports:
+      - "8010:8000"
+    networks:
+      - aic
+
+  # --- Slack Route-B adapter (Tarik) — OPTIONAL, opt-in via the `slack` profile -
+  # Posts pending approvals to Slack with Approve/Deny buttons and turns a button
+  # click into a signature-verified POST /approvals/{id}/decide (same endpoint as
+  # the UI and curl). Needs a Slack app: set SLACK_BOT_TOKEN / SLACK_SIGNING_SECRET
+  # / SLACK_CHANNEL_ID in .env. See orchestration/slack-adapter/README.md.
+  #   docker compose --profile slack up -d --build slack-adapter
+  slack-adapter:
+    profiles: ["slack"]
+    build: ./orchestration/slack-adapter
+    ports:
+      - "8092:8080"
+    env_file: .env
+    environment:
+      APPROVAL_API_URL: ${APPROVAL_API_URL:-http://approval_api:8080}
+    depends_on:
+      - approval_api
+    networks:
+      - aic
+
+networks:
+  aic:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  firestore_data:

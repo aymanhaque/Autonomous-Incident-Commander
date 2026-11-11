@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: {{ include "aic.namespace" . }}
+  labels:
+    {{- include "aic.labels" . | nindent 4 }}
+    app: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      containers:
+        - name: agent
+          image: {{ .Values.images.agent.repository }}:{{ .Values.images.agent.tag }}
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - secretRef:
+                name: aic-secrets
+            - configMapRef:
+                name: aic-config
+          volumeMounts:
+            - name: firestore-sa
+              mountPath: /app/secrets
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: firestore-sa
+          secret:
+            secretName: aic-secrets
+            items:
+              - key: FIRESTORE_SA_JSON
+                path: firestore-service-account.json

@@ -1,0 +1,65 @@
+namespace: aic
+images:
+  agent:
+    repository: aymanhaq/agent
+    tag: sha-54e33cc
+  execution:
+    repository: aymanhaq/execution
+    tag: sha-4dd87e8
+  webUi:
+    repository: aymanhaq/web-ui
+    tag: sha-e9488d6
+  approvalApi:
+    repository: aymanhaq/approval-api
+    tag: sha-ba7e22d
+  redis:
+    repository: redis
+    tag: 7-alpine
+  n8n:
+    repository: docker.n8n.io/n8nio/n8n
+    tag: 2.27.4
+  prometheus:
+    repository: prom/prometheus
+    tag: v2.53.4
+  alertmanager:
+    repository: prom/alertmanager
+    tag: v0.27.0
+n8n:
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+# Non-sensitive config → aic-config ConfigMap
+config:
+  firestoreProjectId: "autonomousincidentcommander"
+  firestoreCredentialsPath: "/app/secrets/firestore-service-account.json"
+  prometheusUrl: "http://prometheus:9090"
+  n8nWebhookUrl: "http://n8n:5678/webhook/aic"
+  langGraphApiUrl: "http://agent:8001"
+  executionApiUrl: "http://execution:8000"
+  approvalApiUrl: "http://approval-api:8080"
+  webhookUrl: "http://n8n:5678/"
+  n8nHost: "n8n"
+  n8nProtocol: "http"
+  n8nSecureCookie: "false"
+  n8nRunnersEnabled: "true"
+  n8nBlockEnvAccess: "false"
+  genericTimezone: "America/New_York"
+  corsAllowOrigins: "http://localhost:3000"
+# Sensitive secrets → aic-secrets Secret
+# Supply at deploy time via a gitignored secrets.values.yaml:
+#   helm upgrade --install aic helm/aic-chart -n aic --create-namespace \
+#     -f secrets.values.yaml
+#
+# secrets.values.yaml example:
+#   secrets:
+#     geminiApiKey: "AIza..."
+#     apiServiceToken: "abc123..."
+#     n8nEncryptionKey: "<openssl rand -hex 16>"
+#     firestoreSaJson: |
+#       { "type": "service_account", ... }
+secrets:
+  geminiApiKey: ""
+  apiServiceToken: ""
+  n8nEncryptionKey: ""
+  firestoreSaJson: ""

@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PodCrashLooping",
+        "severity": "critical",
+        "namespace": "production",
+        "pod": "auth-service-6f7d8c-pq4r5",
+        "container": "auth-service"
+      },
+      "annotations": {
+        "summary": "Pod is crash looping",
+        "description": "Pod auth-service-6f7d8c-pq4r5 has restarted 10 times in the last 15 minutes"
+      },
+      "startsAt": "2026-06-29T10:25:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: approval-api
+  namespace: {{ include "aic.namespace" . }}
+  labels:
+    {{- include "aic.labels" . | nindent 4 }}
+    app: approval-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: approval-api
+  template:
+    metadata:
+      labels:
+        app: approval-api
+    spec:
+      containers:
+        - name: approval-api
+          image: {{ .Values.images.approvalApi.repository }}:{{ .Values.images.approvalApi.tag }}
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: aic-secrets
+            - configMapRef:
+                name: aic-config
+          volumeMounts:
+            - name: firestore-sa
+              mountPath: /app/secrets
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: firestore-sa
+          secret:
+            secretName: aic-secrets
+            items:
+              - key: FIRESTORE_SA_JSON
+                path: firestore-service-account.json

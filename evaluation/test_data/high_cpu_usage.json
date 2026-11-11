@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighCPUUsage",
+        "severity": "warning",
+        "namespace": "production",
+        "pod": "analytics-service-8f9d2c-rt5y6",
+        "container": "analytics-service"
+      },
+      "annotations": {
+        "summary": "Container CPU usage is critically high",
+        "description": "Container analytics-service has been running at 95% CPU for over 10 minutes"
+      },
+      "startsAt": "2026-07-06T10:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

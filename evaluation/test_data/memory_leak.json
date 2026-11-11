@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "MemoryLeak",
+        "severity": "warning",
+        "namespace": "production",
+        "pod": "user-service-2c4e8f-mn7p3",
+        "container": "user-service"
+      },
+      "annotations": {
+        "summary": "Container memory usage growing continuously",
+        "description": "Container user-service memory has grown from 200MB to 1.8GB over 2 hours indicating a memory leak"
+      },
+      "startsAt": "2026-07-06T10:15:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

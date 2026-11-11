@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PersistentVolumeFull",
+        "severity": "critical",
+        "namespace": "production",
+        "persistentvolumeclaim": "database-storage-pvc",
+        "pod": "postgres-primary-0"
+      },
+      "annotations": {
+        "summary": "Persistent volume is nearly full",
+        "description": "PersistentVolumeClaim database-storage-pvc is 97% full with only 3GB remaining out of 100GB"
+      },
+      "startsAt": "2026-07-06T10:35:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}

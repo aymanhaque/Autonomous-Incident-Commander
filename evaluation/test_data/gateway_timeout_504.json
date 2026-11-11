@@ -1,0 +1,22 @@
+{
+  "receiver": "n8n-webhook",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "GatewayTimeout",
+        "severity": "critical",
+        "namespace": "production",
+        "service": "api-gateway",
+        "error_code": "504"
+      },
+      "annotations": {
+        "summary": "API Gateway returning 504 errors",
+        "description": "Service api-gateway has been returning 504 timeout errors for over 5 minutes"
+      },
+      "startsAt": "2026-06-29T10:05:00Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    }
+  ]
+}
